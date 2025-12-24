@@ -206,7 +206,7 @@
     .danmaku-layer {
       position: fixed;
       inset: 0;
-      pointer-events: none;
+      pointer-events: auto;
       overflow: hidden;
       z-index: 2;
     }
@@ -224,6 +224,31 @@
       letter-spacing: 0.5px;
       box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
       animation: fly linear forwards;
+      pointer-events: auto;
+    }
+
+    .danmaku-item::after {
+      content: attr(data-time);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translate(-50%, -8px);
+      padding: 6px 10px;
+      background: rgba(9, 14, 28, 0.86);
+      color: #c7e1ff;
+      font-size: 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    .danmaku-item:hover::after,
+    .danmaku-item:active::after {
+      opacity: 1;
     }
 
     @keyframes fly {
@@ -232,7 +257,7 @@
     }
 
     body.swap #time-particles {
-      transform: translateY(-32vh) scale(0.92);
+      transform: translateY(-18vh) scale(0.92);
     }
 
     body.swap .countdown-wrap {
@@ -293,6 +318,7 @@
     let timeParticles = [];
     let lastTimeString = '';
     let swapApplied = false;
+    let replayStarted = false;
 
     const targetDateString = '2025-12-24T00:00:00+08:00';
     const targetTime = new Date(targetDateString).getTime();
@@ -306,7 +332,7 @@
       if (data.type === 'init') {
         serverOffset = data.now - Date.now();
         blessings = data.messages || [];
-        blessings.forEach(pushDanmaku);
+        startDanmakuReplay();
       }
       if (data.type === 'time') {
         serverOffset = data.now - Date.now();
@@ -338,22 +364,21 @@
 
     function getBeijingNow() {
       const now = getServerNow();
-      const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-      return new Date(utc + 8 * 3600000);
+      return new Date(now.getTime() + (8 * 60 + now.getTimezoneOffset()) * 60000);
     }
 
     function buildTimeParticles(timeStr) {
       lastTimeString = timeStr;
       timeOffCtx.clearRect(0, 0, timeOffscreen.width, timeOffscreen.height);
-      const fontSize = Math.min(timeCanvas.width * 0.18, timeCanvas.height * 0.28);
+      const fontSize = Math.min(timeCanvas.width * 0.18, timeCanvas.height * 0.24);
       timeOffCtx.font = `900 ${fontSize}px 'Inter', 'HarmonyOS Sans', 'Montserrat', sans-serif`;
       timeOffCtx.textAlign = 'center';
       timeOffCtx.textBaseline = 'middle';
       timeOffCtx.fillStyle = '#d9f1ff';
       timeOffCtx.fillText(timeStr, timeOffscreen.width / 2, timeOffscreen.height / 2);
 
-      const gap = 10;
-      const maxParticles = 1400;
+      const gap = 12;
+      const maxParticles = 1200;
       const imageData = timeOffCtx.getImageData(0, 0, timeOffscreen.width, timeOffscreen.height).data;
       const rawPoints = [];
       for (let y = 0; y < timeOffscreen.height; y += gap) {
@@ -368,7 +393,7 @@
       timeParticles = points.map((pt) => ({
         x: pt.x,
         y: pt.y,
-        size: Math.random() * 1.6 + 1.1,
+        size: 1 + ((pt.x + pt.y) % 6) * 0.15,
         color: particleColor(pt.x, pt.y),
       }));
     }
@@ -384,9 +409,9 @@
     }
 
     function particleColor(x, y) {
-      const hue = 180 + ((x + y) % 120);
-      const light = 70 + ((x * 7 + y * 3) % 15);
-      return `hsla(${hue}, 85%, ${light}%, 0.9)`;
+      const hue = 190 + ((x + y) % 90);
+      const light = 68 + ((x * 3 + y * 5) % 12);
+      return `hsla(${hue}, 80%, ${light}%, 0.9)`;
     }
 
     function formatCountdown(ms) {
@@ -409,43 +434,76 @@
 
     function tickTime() {
       const beijingNow = getBeijingNow();
-      const hh = format(beijingNow.getUTCHours());
-      const mm = format(beijingNow.getUTCMinutes());
-      const ss = format(beijingNow.getUTCSeconds());
+      const hh = format(beijingNow.getHours());
+      const mm = format(beijingNow.getMinutes());
+      const ss = format(beijingNow.getSeconds());
       const timeStr = `${hh}:${mm}:${ss}`;
       if (timeStr !== lastTimeString) {
         buildTimeParticles(timeStr);
         drawTimeParticles();
       }
       immersiveTimeEl.textContent = timeStr;
-      immersiveDateEl.textContent = `${beijingNow.getUTCFullYear()}-${format(beijingNow.getUTCMonth() + 1)}-${format(beijingNow.getUTCDate())}`;
+      immersiveDateEl.textContent = `${beijingNow.getFullYear()}-${format(beijingNow.getMonth() + 1)}-${format(beijingNow.getDate())}`;
       updateCountdown(new Date(Date.now() + serverOffset));
       requestAnimationFrame(tickTime);
     }
     tickTime();
 
+    function formatBeijingDateTime(ms) {
+      return new Intl.DateTimeFormat('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        hour12: false,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }).format(ms);
+    }
+
     function pushDanmaku(message) {
       if (!message || !message.text) return;
       if (message.id && seenMessages.has(message.id)) return;
       if (message.id) seenMessages.add(message.id);
+      spawnDanmaku(message);
+    }
+
+    function spawnDanmaku(message) {
       const el = document.createElement('div');
       el.className = 'danmaku-item';
       el.textContent = message.text;
+      el.dataset.time = formatBeijingDateTime(message.createdAt || Date.now());
+      el.title = `发送于 ${el.dataset.time} (UTC+8)`;
+
       const layerHeight = danmakuLayer.clientHeight || window.innerHeight;
-      const top = Math.random() * (layerHeight - 40) + 10;
+      const top = Math.random() * (layerHeight - 48) + 8;
       el.style.top = `${top}px`;
-      const duration = 10 + Math.random() * 6;
+      const duration = 8 + Math.random() * 6;
       el.style.animationDuration = `${duration}s`;
       danmakuLayer.appendChild(el);
-      el.addEventListener('animationend', () => el.remove());
+
+      el.addEventListener('animationend', () => {
+        el.remove();
+        setTimeout(() => spawnDanmaku(message), 2000 + Math.random() * 3000);
+      });
+    }
+
+    function startDanmakuReplay() {
+      if (replayStarted) return;
+      replayStarted = true;
+      blessings.forEach((msg, idx) => {
+        setTimeout(() => pushDanmaku(msg), idx * 300);
+      });
     }
 
     function sendBlessing() {
       const text = messageInput.value.trim();
       if (!text) return;
       const id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
-      const payload = { type: 'blessing', text, id };
-      const message = { id, text, createdAt: Date.now() };
+      const createdAt = Date.now() + serverOffset;
+      const payload = { type: 'blessing', text, id, createdAt };
+      const message = { id, text, createdAt };
       pushDanmaku(message);
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify(payload));

@@ -42,11 +42,12 @@ wss.on('connection', (ws) => {
         const author = String(data.author || '').trim().slice(0, 32) || '游客';
         if (!text) return;
         const normalized = text.slice(0, 160);
+        const clientCreated = Number(data.createdAt);
         const message = {
           id: incomingId || randomUUID(),
           author,
           text: normalized,
-          createdAt: Date.now(),
+          createdAt: Number.isFinite(clientCreated) ? clientCreated : Date.now(),
         };
         blessings = [...blessings, message].slice(-MAX_MESSAGES);
         broadcast({ type: 'blessing', message });
