@@ -38,11 +38,12 @@ wss.on('connection', (ws) => {
       const data = JSON.parse(raw.toString());
       if (data.type === 'blessing') {
         const text = String(data.text || '').trim();
+        const incomingId = String(data.id || '').trim();
         const author = String(data.author || '').trim().slice(0, 32) || '游客';
         if (!text) return;
         const normalized = text.slice(0, 160);
         const message = {
-          id: randomUUID(),
+          id: incomingId || randomUUID(),
           author,
           text: normalized,
           createdAt: Date.now(),
