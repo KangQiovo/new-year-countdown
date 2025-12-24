@@ -15,6 +15,8 @@ const DATA_PATH = path.join(__dirname, 'blessings.json');
 
 let blessings = [];
 
+app.use(express.json());
+
 function ensureDataFile() {
   if (!fs.existsSync(DATA_PATH)) {
     fs.writeFileSync(DATA_PATH, '[]');
@@ -43,6 +45,29 @@ function persistBlessings() {
   });
 }
 
+function normalizeBlessing(data) {
+  const text = String(data.text || '').trim();
+  if (!text) return null;
+  const incomingId = String(data.id || '').trim();
+  const author = String(data.author || '').trim().slice(0, 32) || '游客';
+  const normalized = text.slice(0, 160);
+  const clientCreated = Number(data.createdAt);
+  return {
+    id: incomingId || randomUUID(),
+    author,
+    text: normalized,
+    createdAt: Number.isFinite(clientCreated) ? clientCreated : Date.now(),
+  };
+}
+
+function addBlessing(data) {
+  const message = normalizeBlessing(data);
+  if (!message) return null;
+  blessings = [...blessings, message].slice(-MAX_MESSAGES);
+  persistBlessings();
+  return message;
+}
+
 ensureDataFile();
 loadBlessings();
 
@@ -51,6 +76,16 @@ app.use(express.static(path.join(__dirname)));
 app.get('/api/blessings', (_req, res) => {
   loadBlessings();
   res.json(blessings);
+});
+
+app.post('/api/blessings', (req, res) => {
+  loadBlessings();
+  const message = addBlessing(req.body || {});
+  if (!message) {
+    return res.status(400).json({ error: 'text is required' });
+  }
+  broadcast({ type: 'blessing', message });
+  res.json({ ok: true, message });
 });
 
 function broadcast(payload) {
@@ -76,21 +111,10 @@ wss.on('connection', (ws) => {
     try {
       const data = JSON.parse(raw.toString());
       if (data.type === 'blessing') {
-        const text = String(data.text || '').trim();
-        const incomingId = String(data.id || '').trim();
-        const author = String(data.author || '').trim().slice(0, 32) || '游客';
-        if (!text) return;
-        const normalized = text.slice(0, 160);
-        const clientCreated = Number(data.createdAt);
-        const message = {
-          id: incomingId || randomUUID(),
-          author,
-          text: normalized,
-          createdAt: Number.isFinite(clientCreated) ? clientCreated : Date.now(),
-        };
-        blessings = [...blessings, message].slice(-MAX_MESSAGES);
-        persistBlessings();
-        broadcast({ type: 'blessing', message });
+        const message = addBlessing(data);
+        if (message) {
+          broadcast({ type: 'blessing', message });
+        }
       }
     } catch (error) {
       console.error('Failed to process message', error);

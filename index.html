@@ -321,23 +321,49 @@
       return new Date(targetDateString).getTime();
     }
 
-    const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
+    let socket;
+    let reconnectTimer;
+    const pendingQueue = [];
 
-    socket.addEventListener('message', (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'init') {
-        serverOffset = data.now - Date.now();
-        targetTime = computeTargetTime();
-        ingestBlessings(data.messages);
-      }
-      if (data.type === 'time') {
-        serverOffset = data.now - Date.now();
-      }
-      if (data.type === 'blessing') {
-        blessings.push(data.message);
-        pushDanmaku(data.message);
-      }
-    });
+    function connectSocket() {
+      const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
+      socket = new WebSocket(url);
+
+      socket.addEventListener('open', () => {
+        clearTimeout(reconnectTimer);
+        if (pendingQueue.length) {
+          pendingQueue.splice(0).forEach((payload) => socket.send(JSON.stringify(payload)));
+        }
+        fetchBlessings();
+      });
+
+      socket.addEventListener('message', (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'init') {
+          serverOffset = data.now - Date.now();
+          targetTime = computeTargetTime();
+          ingestBlessings(data.messages);
+        }
+        if (data.type === 'time') {
+          serverOffset = data.now - Date.now();
+        }
+        if (data.type === 'blessing') {
+          blessings.push(data.message);
+          pushDanmaku(data.message);
+        }
+      });
+
+      socket.addEventListener('close', () => {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(connectSocket, 1200);
+      });
+
+      socket.addEventListener('error', () => {
+        socket.close();
+      });
+    }
+
+    connectSocket();
 
     async function fetchBlessings() {
       try {
@@ -512,6 +538,20 @@
       });
     }
 
+    async function postBlessing(payload) {
+      try {
+        const res = await fetch('/api/blessings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        return res.ok;
+      } catch (err) {
+        console.warn('post fallback failed', err);
+        return false;
+      }
+    }
+
     function sendBlessing() {
       const text = messageInput.value.trim();
       if (!text) return;
@@ -520,8 +560,12 @@
       const payload = { type: 'blessing', text, id, createdAt };
       const message = { id, text, createdAt };
       pushDanmaku(message);
-      if (socket.readyState === WebSocket.OPEN) {
+      if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify(payload));
+      } else {
+        postBlessing(payload).then((ok) => {
+          if (!ok) pendingQueue.push(payload);
+        });
       }
       messageInput.value = '';
     }
