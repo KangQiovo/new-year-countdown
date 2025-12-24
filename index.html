@@ -61,11 +61,12 @@
       z-index: 1;
       filter: drop-shadow(0 0 24px rgba(61, 213, 255, 0.28));
       transition: transform 0.9s ease;
+      transform: translateY(6vh);
     }
 
     .time-info {
       position: fixed;
-      top: 32px;
+      top: 76px;
       left: 50%;
       transform: translateX(-50%);
       text-align: center;
@@ -103,7 +104,7 @@
 
     .countdown-wrap {
       position: fixed;
-      top: 18px;
+      top: 52px;
       left: 50%;
       transform: translateX(-50%);
       display: flex;
@@ -137,7 +138,7 @@
 
     .target-label {
       position: fixed;
-      top: 86px;
+      top: 134px;
       left: 50%;
       transform: translateX(-50%);
       padding: 6px 12px;
@@ -223,7 +224,7 @@
       font-weight: 700;
       letter-spacing: 0.5px;
       box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
-      animation: fly linear forwards;
+      animation: fly linear infinite;
       pointer-events: auto;
     }
 
@@ -252,26 +253,26 @@
     }
 
     @keyframes fly {
-      from { transform: translateX(120%); }
-      to { transform: translateX(-150%); }
+      from { transform: translateX(110vw); }
+      to { transform: translateX(-160vw); }
     }
 
     body.swap #time-particles {
-      transform: translateY(-18vh) scale(0.92);
+      transform: translateY(-8vh) scale(0.92);
     }
 
     body.swap .countdown-wrap {
       top: 50%;
-      transform: translate(-50%, -55%);
+      transform: translate(-50%, -45%);
     }
 
     body.swap .time-info {
-      top: 26px;
+      top: 40px;
       transform: translate(-50%, 0);
     }
 
     body.swap .target-label {
-      top: 120px;
+      top: 150px;
     }
   </style>
 </head>
@@ -375,7 +376,8 @@
       timeOffCtx.textAlign = 'center';
       timeOffCtx.textBaseline = 'middle';
       timeOffCtx.fillStyle = '#d9f1ff';
-      timeOffCtx.fillText(timeStr, timeOffscreen.width / 2, timeOffscreen.height / 2);
+      const centerY = timeOffscreen.height * 0.56;
+      timeOffCtx.fillText(timeStr, timeOffscreen.width / 2, centerY);
 
       const gap = 12;
       const maxParticles = 1200;
@@ -483,10 +485,8 @@
       el.style.animationDuration = `${duration}s`;
       danmakuLayer.appendChild(el);
 
-      el.addEventListener('animationend', () => {
-        el.remove();
-        setTimeout(() => spawnDanmaku(message), 2000 + Math.random() * 3000);
-      });
+      const delay = -Math.random() * duration;
+      el.style.animationDelay = `${delay}s`;
     }
 
     function startDanmakuReplay() {

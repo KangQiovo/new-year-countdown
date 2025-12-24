@@ -3,6 +3,7 @@ const express = require('express');
 const http = require('http');
 const { WebSocketServer } = require('ws');
 const { randomUUID } = require('crypto');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -10,8 +11,32 @@ const wss = new WebSocketServer({ server });
 
 const PORT = process.env.PORT || 3000;
 const MAX_MESSAGES = 200;
+const DATA_PATH = path.join(__dirname, 'blessings.json');
 
 let blessings = [];
+
+function loadBlessings() {
+  try {
+    const raw = fs.readFileSync(DATA_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      blessings = parsed.slice(-MAX_MESSAGES);
+    }
+  } catch (error) {
+    blessings = [];
+  }
+}
+
+function persistBlessings() {
+  const payload = JSON.stringify(blessings.slice(-MAX_MESSAGES), null, 2);
+  fs.writeFile(DATA_PATH, payload, (err) => {
+    if (err) {
+      console.error('Failed to persist blessings:', err);
+    }
+  });
+}
+
+loadBlessings();
 
 app.use(express.static(path.join(__dirname)));
 
@@ -50,6 +75,7 @@ wss.on('connection', (ws) => {
           createdAt: Number.isFinite(clientCreated) ? clientCreated : Date.now(),
         };
         blessings = [...blessings, message].slice(-MAX_MESSAGES);
+        persistBlessings();
         broadcast({ type: 'blessing', message });
       }
     } catch (error) {
