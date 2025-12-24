@@ -61,7 +61,7 @@
       z-index: 1;
       filter: drop-shadow(0 0 24px rgba(61, 213, 255, 0.28));
       transition: transform 0.9s ease;
-      transform: translateY(6vh);
+      transform: translateY(0);
     }
 
     .time-info {
@@ -261,17 +261,7 @@
     }
 
     body.swap #time-particles {
-      transform: translateY(-8vh) scale(0.92);
-    }
-
-    body.swap .bottom-stack {
-      bottom: 52%;
-      transform: translate(-50%, 52%);
-    }
-
-    body.swap .time-info {
-      top: 48px;
-      transform: translate(-50%, 0);
+      transform: translateY(0);
     }
   </style>
 </head>
@@ -320,7 +310,6 @@
     let timeParticles = [];
     let lastTimeString = '';
     let swapApplied = false;
-    let replayStarted = false;
 
     let targetTime = 0;
 
@@ -338,9 +327,8 @@
       const data = JSON.parse(event.data);
       if (data.type === 'init') {
         serverOffset = data.now - Date.now();
-        blessings = data.messages || [];
         targetTime = computeTargetTime();
-        startDanmakuReplay();
+        ingestBlessings(data.messages);
       }
       if (data.type === 'time') {
         serverOffset = data.now - Date.now();
@@ -350,6 +338,17 @@
         pushDanmaku(data.message);
       }
     });
+
+    async function fetchBlessings() {
+      try {
+        const res = await fetch('/api/blessings', { cache: 'no-store' });
+        if (!res.ok) return;
+        const list = await res.json();
+        ingestBlessings(list);
+      } catch (err) {
+        console.error('Failed to fetch blessings', err);
+      }
+    }
 
     function resizeTimeCanvas() {
       timeCanvas.width = window.innerWidth;
@@ -365,6 +364,7 @@
     resizeTimeCanvas();
 
     targetTime = computeTargetTime();
+    fetchBlessings();
 
     function format(num) { return num.toString().padStart(2, '0'); }
 
@@ -380,16 +380,16 @@
     function buildTimeParticles(timeStr) {
       lastTimeString = timeStr;
       timeOffCtx.clearRect(0, 0, timeOffscreen.width, timeOffscreen.height);
-      const fontSize = Math.min(timeCanvas.width * 0.18, timeCanvas.height * 0.24);
+      const fontSize = Math.min(timeCanvas.width * 0.2, timeCanvas.height * 0.26);
       timeOffCtx.font = `900 ${fontSize}px 'Inter', 'HarmonyOS Sans', 'Montserrat', sans-serif`;
       timeOffCtx.textAlign = 'center';
       timeOffCtx.textBaseline = 'middle';
       timeOffCtx.fillStyle = '#d9f1ff';
-      const centerY = timeOffscreen.height * 0.56;
+      const centerY = timeOffscreen.height * 0.52;
       timeOffCtx.fillText(timeStr, timeOffscreen.width / 2, centerY);
 
-      const gap = 12;
-      const maxParticles = 1200;
+      const gap = 8;
+      const maxParticles = 2400;
       const imageData = timeOffCtx.getImageData(0, 0, timeOffscreen.width, timeOffscreen.height).data;
       const rawPoints = [];
       for (let y = 0; y < timeOffscreen.height; y += gap) {
@@ -502,11 +502,13 @@
       el.style.animationDelay = `${delay}s`;
     }
 
-    function startDanmakuReplay() {
-      if (replayStarted) return;
-      replayStarted = true;
-      blessings.forEach((msg, idx) => {
-        setTimeout(() => pushDanmaku(msg), idx * 300);
+    function ingestBlessings(list) {
+      if (!Array.isArray(list)) return;
+      const sorted = [...list].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      sorted.forEach((msg, idx) => {
+        if (msg.id && seenMessages.has(msg.id)) return;
+        blessings.push(msg);
+        setTimeout(() => pushDanmaku(msg), idx * 120);
       });
     }
 

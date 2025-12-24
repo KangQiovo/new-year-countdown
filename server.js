@@ -15,7 +15,14 @@ const DATA_PATH = path.join(__dirname, 'blessings.json');
 
 let blessings = [];
 
+function ensureDataFile() {
+  if (!fs.existsSync(DATA_PATH)) {
+    fs.writeFileSync(DATA_PATH, '[]');
+  }
+}
+
 function loadBlessings() {
+  ensureDataFile();
   try {
     const raw = fs.readFileSync(DATA_PATH, 'utf-8');
     const parsed = JSON.parse(raw);
@@ -36,9 +43,15 @@ function persistBlessings() {
   });
 }
 
+ensureDataFile();
 loadBlessings();
 
 app.use(express.static(path.join(__dirname)));
+
+app.get('/api/blessings', (_req, res) => {
+  loadBlessings();
+  res.json(blessings);
+});
 
 function broadcast(payload) {
   const message = JSON.stringify(payload);
