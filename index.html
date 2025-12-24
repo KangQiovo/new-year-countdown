@@ -60,6 +60,7 @@
       pointer-events: none;
       z-index: 1;
       filter: drop-shadow(0 0 24px rgba(61, 213, 255, 0.28));
+      transition: transform 0.9s ease;
     }
 
     .time-info {
@@ -77,6 +78,8 @@
       background: rgba(0, 6, 18, 0.28);
       border: 1px solid rgba(255, 255, 255, 0.08);
       backdrop-filter: blur(12px);
+      transition: all 0.9s ease;
+      z-index: 2;
     }
 
     #immersive-date {
@@ -96,6 +99,58 @@
       clip: rect(0, 0, 0, 0);
       white-space: nowrap;
       border: 0;
+    }
+
+    .countdown-wrap {
+      position: fixed;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 16px;
+      background: rgba(11, 16, 36, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      box-shadow: 0 16px 38px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(14px);
+      transition: all 0.9s ease;
+      z-index: 3;
+    }
+
+    #countdown-value {
+      font-size: clamp(18px, 3vw, 30px);
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #e2e8f0;
+      text-shadow: 0 6px 18px rgba(0, 0, 0, 0.36);
+      white-space: nowrap;
+    }
+
+    #countdown-title {
+      font-size: 12px;
+      letter-spacing: 1px;
+      opacity: 0.76;
+    }
+
+    .target-label {
+      position: fixed;
+      top: 86px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(10px);
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 2px;
+      color: rgba(226, 232, 240, 0.9);
+      transition: all 0.9s ease;
+      z-index: 3;
     }
 
     .controls {
@@ -175,6 +230,24 @@
       from { transform: translateX(120%); }
       to { transform: translateX(-150%); }
     }
+
+    body.swap #time-particles {
+      transform: translateY(-32vh) scale(0.92);
+    }
+
+    body.swap .countdown-wrap {
+      top: 50%;
+      transform: translate(-50%, -55%);
+    }
+
+    body.swap .time-info {
+      top: 26px;
+      transform: translate(-50%, 0);
+    }
+
+    body.swap .target-label {
+      top: 120px;
+    }
   </style>
 </head>
 <body>
@@ -182,6 +255,11 @@
   <div class="noise"></div>
 
   <canvas id="time-particles"></canvas>
+  <div class="countdown-wrap" id="countdown-wrap">
+    <div id="countdown-title">跨年倒计时</div>
+    <div id="countdown-value">-- 天 -- 时 -- 分 -- 秒</div>
+  </div>
+  <div class="target-label" id="target-label">2025-12-24</div>
   <div class="time-info">
     <div>北京时间 · UTC+8</div>
     <span id="immersive-date">0000-00-00</span>
@@ -198,6 +276,9 @@
   <script>
     const immersiveTimeEl = document.getElementById('immersive-time');
     const immersiveDateEl = document.getElementById('immersive-date');
+    const countdownValueEl = document.getElementById('countdown-value');
+    const countdownWrap = document.getElementById('countdown-wrap');
+    const targetLabelEl = document.getElementById('target-label');
     const messageInput = document.getElementById('message');
     const sendButton = document.getElementById('send');
     const danmakuLayer = document.getElementById('danmaku-layer');
@@ -211,6 +292,12 @@
     const seenMessages = new Set();
     let timeParticles = [];
     let lastTimeString = '';
+    let swapApplied = false;
+
+    const targetDateString = '2025-12-24T00:00:00+08:00';
+    const targetTime = new Date(targetDateString).getTime();
+    const targetDateLabel = targetDateString.split('T')[0];
+    targetLabelEl.textContent = targetDateLabel;
 
     const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
 
@@ -219,8 +306,8 @@
       if (data.type === 'init') {
         serverOffset = data.now - Date.now();
         blessings = data.messages || [];
-      blessings.forEach(pushDanmaku);
-    }
+        blessings.forEach(pushDanmaku);
+      }
       if (data.type === 'time') {
         serverOffset = data.now - Date.now();
       }
@@ -235,12 +322,25 @@
       timeCanvas.height = window.innerHeight;
       timeOffscreen.width = window.innerWidth;
       timeOffscreen.height = window.innerHeight;
-      if (lastTimeString) buildTimeParticles(lastTimeString);
+      if (lastTimeString) {
+        buildTimeParticles(lastTimeString);
+        drawTimeParticles();
+      }
     }
     window.addEventListener('resize', resizeTimeCanvas);
     resizeTimeCanvas();
 
     function format(num) { return num.toString().padStart(2, '0'); }
+
+    function getServerNow() {
+      return new Date(Date.now() + serverOffset);
+    }
+
+    function getBeijingNow() {
+      const now = getServerNow();
+      const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+      return new Date(utc + 8 * 3600000);
+    }
 
     function buildTimeParticles(timeStr) {
       lastTimeString = timeStr;
@@ -252,63 +352,74 @@
       timeOffCtx.fillStyle = '#d9f1ff';
       timeOffCtx.fillText(timeStr, timeOffscreen.width / 2, timeOffscreen.height / 2);
 
-      const gap = 6;
+      const gap = 10;
+      const maxParticles = 1400;
       const imageData = timeOffCtx.getImageData(0, 0, timeOffscreen.width, timeOffscreen.height).data;
-      const points = [];
+      const rawPoints = [];
       for (let y = 0; y < timeOffscreen.height; y += gap) {
         for (let x = 0; x < timeOffscreen.width; x += gap) {
           const idx = (y * timeOffscreen.width + x) * 4 + 3;
-          if (imageData[idx] > 80) points.push({ x, y });
+          if (imageData[idx] > 80) rawPoints.push({ x, y });
         }
       }
 
-      while (timeParticles.length < points.length) {
-        timeParticles.push({
-          x: Math.random() * timeCanvas.width,
-          y: Math.random() * timeCanvas.height,
-          vx: 0,
-          vy: 0,
-          size: Math.random() * 2 + 1.2,
-          color: `hsla(${180 + Math.random() * 120}, 85%, ${70 + Math.random() * 20}%, 0.9)`,
-        });
-      }
-      timeParticles = timeParticles.slice(0, points.length);
-      timeParticles.forEach((p, i) => {
-        const target = points[i];
-        p.tx = target.x;
-        p.ty = target.y;
-        p.vx = p.vx || 0;
-        p.vy = p.vy || 0;
-      });
+      const step = Math.max(1, Math.ceil(rawPoints.length / maxParticles));
+      const points = rawPoints.filter((_, i) => i % step === 0);
+      timeParticles = points.map((pt) => ({
+        x: pt.x,
+        y: pt.y,
+        size: Math.random() * 1.6 + 1.1,
+        color: particleColor(pt.x, pt.y),
+      }));
     }
 
-    function renderTimeParticles() {
+    function drawTimeParticles() {
       timeCtx.clearRect(0, 0, timeCanvas.width, timeCanvas.height);
       timeParticles.forEach((p) => {
-        const dx = p.tx - p.x;
-        const dy = p.ty - p.y;
-        p.vx = (p.vx + dx * 0.06) * 0.86;
-        p.vy = (p.vy + dy * 0.06) * 0.86;
-        p.x += p.vx + (Math.random() - 0.5) * 0.3;
-        p.y += p.vy + (Math.random() - 0.5) * 0.3;
         timeCtx.fillStyle = p.color;
         timeCtx.beginPath();
         timeCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         timeCtx.fill();
       });
-      requestAnimationFrame(renderTimeParticles);
     }
-    renderTimeParticles();
+
+    function particleColor(x, y) {
+      const hue = 180 + ((x + y) % 120);
+      const light = 70 + ((x * 7 + y * 3) % 15);
+      return `hsla(${hue}, 85%, ${light}%, 0.9)`;
+    }
+
+    function formatCountdown(ms) {
+      const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      return `${days} 天 ${format(hours)} 时 ${format(minutes)} 分 ${format(seconds)} 秒`;
+    }
+
+    function updateCountdown(now) {
+      const remaining = targetTime - now.getTime();
+      countdownValueEl.textContent = formatCountdown(remaining);
+      if (remaining <= 600000 && !swapApplied) {
+        document.body.classList.add('swap');
+        swapApplied = true;
+      }
+    }
 
     function tickTime() {
-      const now = new Date(Date.now() + serverOffset);
-      const hh = format(now.getHours());
-      const mm = format(now.getMinutes());
-      const ss = format(now.getSeconds());
+      const beijingNow = getBeijingNow();
+      const hh = format(beijingNow.getUTCHours());
+      const mm = format(beijingNow.getUTCMinutes());
+      const ss = format(beijingNow.getUTCSeconds());
       const timeStr = `${hh}:${mm}:${ss}`;
-      if (timeStr !== lastTimeString) buildTimeParticles(timeStr);
+      if (timeStr !== lastTimeString) {
+        buildTimeParticles(timeStr);
+        drawTimeParticles();
+      }
       immersiveTimeEl.textContent = timeStr;
-      immersiveDateEl.textContent = `${now.getFullYear()}-${format(now.getMonth() + 1)}-${format(now.getDate())}`;
+      immersiveDateEl.textContent = `${beijingNow.getUTCFullYear()}-${format(beijingNow.getUTCMonth() + 1)}-${format(beijingNow.getUTCDate())}`;
+      updateCountdown(new Date(Date.now() + serverOffset));
       requestAnimationFrame(tickTime);
     }
     tickTime();
@@ -323,7 +434,7 @@
       const layerHeight = danmakuLayer.clientHeight || window.innerHeight;
       const top = Math.random() * (layerHeight - 40) + 10;
       el.style.top = `${top}px`;
-      const duration = 16 + Math.random() * 10; // slower sweep
+      const duration = 10 + Math.random() * 6;
       el.style.animationDuration = `${duration}s`;
       danmakuLayer.appendChild(el);
       el.addEventListener('animationend', () => el.remove());
