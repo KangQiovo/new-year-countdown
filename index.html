@@ -1,1 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>跨年倒计时 · 全球共享祝福</title>
+  <style>
+    :root {
+      --glass: rgba(255, 255, 255, 0.12);
+      --glass-strong: rgba(255, 255, 255, 0.18);
+      --accent: #ff7f50;
+      --accent-2: #7dd3fc;
+      --bg: radial-gradient(circle at 20% 20%, rgba(255, 117, 117, 0.25), transparent 35%),
+        radial-gradient(circle at 80% 10%, rgba(125, 211, 252, 0.25), transparent 35%),
+        radial-gradient(circle at 50% 80%, rgba(244, 114, 182, 0.35), transparent 45%),
+        linear-gradient(135deg, #0f172a, #020617);
+      --blur: 18px;
+      --shadow: 0 15px 45px rgba(0, 0, 0, 0.45);
+    }
 
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', 'HarmonyOS Sans', 'PingFang SC', 'Microsoft YaHei', system-ui;
+      background-image: var(--bg);
+      color: #e2e8f0;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .noise {
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(0deg, rgba(255,255,255,0.04) 0, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 2px),
+                  repeating-linear-gradient(90deg, rgba(255,255,255,0.04) 0, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 2px);
+      opacity: 0.25;
+      pointer-events: none;
+      mix-blend-mode: soft-light;
+    }
+
+    main {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 20px;
+      padding: 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      backdrop-filter: blur(var(--blur));
+      background: var(--glass);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 16px 20px;
+      box-shadow: var(--shadow);
+    }
+
+    h1 {
+      font-size: 28px;
+      letter-spacing: 1px;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    h1 span.logo-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #fbbf24, #f472b6, #22d3ee);
+      box-shadow: 0 0 18px rgba(248, 113, 113, 0.6);
+    }
+
+    .time-panel {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      font-size: 18px;
+      color: #cbd5e1;
+      font-weight: 600;
+    }
+
+    .glass {
+      background: var(--glass);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      backdrop-filter: blur(var(--blur));
+      box-shadow: var(--shadow);
+    }
+
+    .countdown {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 18px;
+      padding: 24px;
+      align-items: center;
+    }
+
+    .time-card {
+      position: relative;
+      padding: 16px 18px;
+      overflow: hidden;
+      border-radius: 16px;
+      background: linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .time-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.22), transparent 60%);
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    .time-value {
+      font-size: 44px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #f8fafc;
+      text-shadow: 0 0 24px rgba(125, 211, 252, 0.6), 0 0 32px rgba(244, 114, 182, 0.45);
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .time-label {
+      color: #cbd5e1;
+      letter-spacing: 1px;
+      font-size: 14px;
+      margin-top: 4px;
+    }
+
+    .blessing-form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      padding: 18px 20px;
+      align-items: center;
+    }
+
+    .blessing-form input,
+    .blessing-form textarea,
+    .blessing-form button {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: var(--glass-strong);
+      color: #e2e8f0;
+      outline: none;
+      transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+      font-size: 14px;
+      resize: none;
+    }
+
+    .blessing-form input:focus,
+    .blessing-form textarea:focus {
+      border-color: rgba(125, 211, 252, 0.5);
+      box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.15);
+      transform: translateY(-1px);
+    }
+
+    .blessing-form button {
+      background: linear-gradient(135deg, #22d3ee, #f472b6);
+      color: #0f172a;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 12px 30px rgba(244, 114, 182, 0.25);
+    }
+
+    .blessing-form button:hover {
+      transform: translateY(-2px) scale(1.01);
+    }
+
+    .ticker {
+      position: relative;
+      overflow: hidden;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.04);
+      min-height: 56px;
+      display: flex;
+      align-items: center;
+    }
+
+    .ticker::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(90deg, rgba(15, 23, 42, 0.8), transparent 15%, transparent 85%, rgba(15, 23, 42, 0.8));
+    }
+
+    .ticker-track {
+      display: flex;
+      gap: 28px;
+      white-space: nowrap;
+      animation: marquee 22s linear infinite;
+    }
+
+    .ticker.paused .ticker-track {
+      animation-play-state: paused;
+    }
+
+    @keyframes marquee {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+
+    .ticker-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.08);
+      padding: 10px 14px;
+      border-radius: 12px;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .ticker-item small {
+      color: #cbd5e1;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+    }
+
+    .ticker-item strong {
+      color: #f8fafc;
+      font-size: 15px;
+    }
+
+    .ticker-item::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 20% 20%, rgba(125, 211, 252, 0.2), transparent 50%);
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    .celebrate .ticker-item {
+      animation: float-up 1.8s ease forwards;
+    }
+
+    @keyframes float-up {
+      0% { transform: translateY(0) scale(1); opacity: 1; }
+      60% { transform: translateY(-140px) scale(1.05); opacity: 1; }
+      100% { transform: translateY(-260px) scale(0.9); opacity: 0; }
+    }
+
+    canvas#sky {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    footer {
+      text-align: center;
+      color: #cbd5e1;
+      font-size: 14px;
+      padding-bottom: 12px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.1);
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 12px rgba(34, 197, 94, 0.6);
+    }
+
+    @media (max-width: 640px) {
+      main { padding: 20px; }
+      h1 { font-size: 22px; }
+      .time-value { font-size: 36px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="sky"></canvas>
+  <div class="noise"></div>
+  <main>
+    <header class="glass">
+      <h1><span class="logo-dot"></span> 全球新年倒计时</h1>
+      <div class="time-panel">
+        <div class="chip"><span class="status-dot" id="ws-status"></span>实时时间 UTC+8</div>
+        <div id="current-time"></div>
+      </div>
+    </header>
+
+    <section class="glass countdown">
+      <div class="time-card">
+        <div class="time-value"><span id="days">--</span><span>天</span></div>
+        <div class="time-label">Days</div>
+      </div>
+      <div class="time-card">
+        <div class="time-value"><span id="hours">--</span><span>时</span></div>
+        <div class="time-label">Hours</div>
+      </div>
+      <div class="time-card">
+        <div class="time-value"><span id="minutes">--</span><span>分</span></div>
+        <div class="time-label">Minutes</div>
+      </div>
+      <div class="time-card">
+        <div class="time-value"><span id="seconds">--</span><span>秒</span></div>
+        <div class="time-label">Seconds</div>
+      </div>
+    </section>
+
+    <section class="glass blessing-form">
+      <input id="author" type="text" placeholder="昵称（可选，默认“游客”）" maxlength="32" />
+      <textarea id="message" rows="1" placeholder="写下你的新年祝福，所有人都能看到" maxlength="160"></textarea>
+      <button id="send">放飞祝福</button>
+    </section>
+
+    <section class="glass ticker" id="ticker">
+      <div class="ticker-track" id="ticker-track"></div>
+    </section>
+
+    <footer>
+      让我们一起迎接下一段旅程 · 愿所有祝福都开花绽放
+    </footer>
+  </main>
+
+  <script>
+    const wsStatus = document.getElementById('ws-status');
+    const currentTimeEl = document.getElementById('current-time');
+    const ids = ['days', 'hours', 'minutes', 'seconds'].reduce((acc, id) => {
+      acc[id] = document.getElementById(id);
+      return acc;
+    }, {});
+
+    const ticker = document.getElementById('ticker');
+    const tickerTrack = document.getElementById('ticker-track');
+    const authorInput = document.getElementById('author');
+    const messageInput = document.getElementById('message');
+    const sendButton = document.getElementById('send');
+
+    let blessings = [];
+    let serverOffset = 0;
+    let hasCelebrated = false;
+
+    const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
+
+    socket.addEventListener('open', () => {
+      wsStatus.style.background = '#22c55e';
+    });
+
+    socket.addEventListener('close', () => {
+      wsStatus.style.background = '#ef4444';
+    });
+
+    socket.addEventListener('message', (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'init') {
+        serverOffset = data.now - Date.now();
+        blessings = data.messages || [];
+        renderTicker();
+      }
+      if (data.type === 'time') {
+        serverOffset = data.now - Date.now();
+      }
+      if (data.type === 'blessing') {
+        blessings.push(data.message);
+        blessings = blessings.slice(-200);
+        appendTickerItem(data.message);
+      }
+    });
+
+    sendButton.addEventListener('click', () => {
+      const text = messageInput.value.trim();
+      if (!text) return alert('请输入祝福语');
+      socket.send(
+        JSON.stringify({
+          type: 'blessing',
+          text,
+          author: authorInput.value.trim() || '游客',
+        })
+      );
+      messageInput.value = '';
+    });
+
+    function getUtc8Now() {
+      return new Date(Date.now() + serverOffset + 8 * 60 * 60 * 1000);
+    }
+
+    function targetUtcTimestamp() {
+      const now = getUtc8Now();
+      const year = now.getUTCFullYear();
+      return Date.UTC(year + 1, 0, 1, -8); // next Jan 1 00:00 at UTC+8
+    }
+
+    function updateCountdown() {
+      const now = Date.now() + serverOffset;
+      const diff = targetUtcTimestamp() - now;
+      const reached = diff <= 0;
+
+      const totalSeconds = Math.max(0, Math.floor(diff / 1000));
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+
+      ids.days.textContent = String(days).padStart(2, '0');
+      ids.hours.textContent = String(hours).padStart(2, '0');
+      ids.minutes.textContent = String(minutes).padStart(2, '0');
+      ids.seconds.textContent = String(seconds).padStart(2, '0');
+
+      const nowUtc8 = getUtc8Now();
+      currentTimeEl.textContent = nowUtc8.toISOString().replace('T', ' ').slice(0, 19) + ' UTC+8';
+
+      if (reached && !hasCelebrated) {
+        hasCelebrated = true;
+        celebrate();
+      }
+    }
+
+    function renderTicker() {
+      tickerTrack.innerHTML = '';
+      const items = [...blessings, ...blessings];
+      items.forEach((item) => appendTickerItem(item));
+    }
+
+    function appendTickerItem(item) {
+      const el = document.createElement('div');
+      el.className = 'ticker-item';
+      el.innerHTML = `<small>🎉 ${escapeHtml(item.author)}</small><strong>${escapeHtml(item.text)}</strong>`;
+      tickerTrack.appendChild(el);
+      if (tickerTrack.children.length > 0 && tickerTrack.children.length % (blessings.length || 1) === 0) {
+        tickerTrack.style.animationDuration = Math.max(12, blessings.length * 0.8) + 's';
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function celebrate() {
+      ticker.classList.add('celebrate');
+      releaseFireworksFromMessages();
+      setTimeout(() => ticker.classList.remove('celebrate'), 2500);
+      burstSky(12);
+    }
+
+    // Fireworks implementation
+    const canvas = document.getElementById('sky');
+    const ctx = canvas.getContext('2d');
+    let width, height;
+
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    const particles = [];
+    function createParticle(x, y, color) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 4 + 2;
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        alpha: 1,
+        radius: Math.random() * 3 + 1.5,
+        color,
+      });
+    }
+
+    function burstSky(times = 8) {
+      for (let i = 0; i < times; i++) {
+        setTimeout(() => {
+          const x = Math.random() * width;
+          const y = Math.random() * height * 0.6;
+          for (let j = 0; j < 80; j++) {
+            createParticle(x, y, randomColor());
+          }
+        }, i * 300 + Math.random() * 120);
+      }
+    }
+
+    function releaseFireworksFromMessages() {
+      const rect = ticker.getBoundingClientRect();
+      const items = Array.from(tickerTrack.children);
+      items.forEach((item, idx) => {
+        const x = (idx / Math.max(1, items.length)) * width + Math.random() * 40 - 20;
+        const y = rect.top + Math.random() * rect.height;
+        for (let j = 0; j < 40; j++) {
+          createParticle(x, y, randomColor());
+        }
+      });
+    }
+
+    function randomColor() {
+      const palette = ['#22d3ee', '#f472b6', '#fbbf24', '#a855f7', '#38bdf8'];
+      return palette[Math.floor(Math.random() * palette.length)];
+    }
+
+    function animate() {
+      ctx.fillStyle = 'rgba(0, 7, 25, 0.25)';
+      ctx.fillRect(0, 0, width, height);
+
+      particles.forEach((p) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.03;
+        p.alpha -= 0.007;
+        ctx.globalAlpha = Math.max(p.alpha, 0);
+        const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 4);
+        gradient.addColorStop(0, p.color);
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius * 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        if (particles[i].alpha <= 0) particles.splice(i, 1);
+      }
+
+      requestAnimationFrame(animate);
+    }
+    animate();
+
+    setInterval(updateCountdown, 1000);
+    updateCountdown();
+  </script>
+</body>
+</html>
