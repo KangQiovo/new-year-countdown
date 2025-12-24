@@ -50,6 +50,7 @@ function broadcast(payload) {
 }
 
 wss.on('connection', (ws) => {
+  loadBlessings();
   ws.send(
     JSON.stringify({
       type: 'init',
